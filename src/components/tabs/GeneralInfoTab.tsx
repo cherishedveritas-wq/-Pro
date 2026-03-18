@@ -111,7 +111,7 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
       const ai = new GoogleGenAI({ apiKey });
       
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.1-pro-preview',
         contents: {
           parts: [
             ...fileParts,
