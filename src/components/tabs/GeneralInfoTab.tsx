@@ -3,6 +3,7 @@ import { Input } from '../ui/Input';
 import { useValuation } from '../../store';
 import { Database, Info, Upload, Loader2 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
+import * as XLSX from 'xlsx';
 
 export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof useValuation> }) {
   const { state, updateGeneralInfo, updateIndustryMultiples, updateHistoricalYear } = valuation;
@@ -57,20 +58,46 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
     setIsAnalyzing(true);
     try {
       const fileParts = await Promise.all(files.map(async (file) => {
-        return new Promise<any>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64Data = (reader.result as string).split(',')[1];
-            resolve({
-              inlineData: {
-                mimeType: file.type || 'application/pdf',
-                data: base64Data
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.csv')) {
+          return new Promise<any>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                let csvText = '';
+                workbook.SheetNames.forEach(sheetName => {
+                  const worksheet = workbook.Sheets[sheetName];
+                  csvText += `Sheet: ${sheetName}\n`;
+                  csvText += XLSX.utils.sheet_to_csv(worksheet);
+                  csvText += '\n\n';
+                });
+                resolve({
+                  text: csvText
+                });
+              } catch (err) {
+                reject(err);
               }
-            });
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+          });
+        } else {
+          return new Promise<any>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64Data = (reader.result as string).split(',')[1];
+              resolve({
+                inlineData: {
+                  mimeType: file.type || 'application/pdf',
+                  data: base64Data
+                }
+              });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
       }));
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -134,7 +161,7 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
               },
               year0Ppe: { type: Type.NUMBER, description: "The PPE value for the year immediately preceding the oldest year in historicalData" }
             },
-            required: ["companyName", "industry", "historicalData", "year0Ppe"]
+            required: ["historicalData", "year0Ppe"]
           }
         }
       });
@@ -168,9 +195,9 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
       } else {
         throw new Error('Invalid data format received from AI');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analyzing file:', error);
-      alert('파일 분석 중 오류가 발생했습니다. 다시 시도해주세요.');
+      alert(`파일 분석 중 오류가 발생했습니다. 다시 시도해주세요.\n상세 오류: ${error?.message || error}`);
     } finally {
       setIsAnalyzing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
