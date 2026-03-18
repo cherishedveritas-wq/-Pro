@@ -100,10 +100,14 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
         }
       }));
 
-      const apiKey = process.env.GEMINI_API_KEY;
+      const rawApiKey = process.env.GEMINI_API_KEY;
+      const apiKey = rawApiKey ? rawApiKey.trim() : '';
+      
       if (!apiKey || apiKey === 'undefined') {
         throw new Error('Gemini API 키가 설정되지 않았거나 유효하지 않습니다. 설정에서 API 키를 확인해주세요.');
       }
+      
+      // Cache buster: 2026-03-18
       const ai = new GoogleGenAI({ apiKey });
       
       const response = await ai.models.generateContent({
