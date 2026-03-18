@@ -100,7 +100,11 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
         }
       }));
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || apiKey === 'undefined') {
+        throw new Error('Gemini API 키가 설정되지 않았거나 유효하지 않습니다. 설정에서 API 키를 확인해주세요.');
+      }
+      const ai = new GoogleGenAI({ apiKey });
       
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
