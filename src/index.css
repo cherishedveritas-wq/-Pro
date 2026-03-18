@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@media print {
+  body {
+    background-color: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Hide sidebar and navigation */
+  nav, header, .print-hide {
+    display: none !important;
+  }
+
+  /* Make main content take full width */
+  main {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove shadows and borders for cleaner print */
+  .shadow-sm, .shadow-md, .shadow-lg {
+    box-shadow: none !important;
+  }
+
+  /* Ensure charts fit on page */
+  .recharts-wrapper {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Avoid page breaks inside important elements */
+  .bg-white, .bg-slate-50 {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
