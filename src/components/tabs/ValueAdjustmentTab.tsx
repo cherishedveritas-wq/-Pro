@@ -1,7 +1,7 @@
 import React from 'react';
 import { useValuation } from '../../store';
 import { FormattedNumberInput } from '../ui/FormattedNumberInput';
-import { ShieldAlert, Database, Info } from 'lucide-react';
+import { ShieldAlert, Database, Info, Plus, Minus, Calculator } from 'lucide-react';
 
 export function ValueAdjustmentTab({ valuation }: { valuation: ReturnType<typeof useValuation> }) {
   const { state, updateValueAdjustments } = valuation;
@@ -16,8 +16,8 @@ export function ValueAdjustmentTab({ valuation }: { valuation: ReturnType<typeof
     if (historicalData && historicalData.length > 0) {
       const lastYearData = historicalData[historicalData.length - 1];
       updateValueAdjustments('cashAndEquivalents', lastYearData.cash);
-      updateValueAdjustments('totalDebt', lastYearData.shortTermDebt);
-      alert(`가장 최근 연도(${lastYearData.year}년)의 재무데이터를 성공적으로 불러왔습니다.\n\n- 현금 및 현금성 자산: ${lastYearData.cash.toLocaleString()}\n- 총 차입금: ${lastYearData.shortTermDebt.toLocaleString()}`);
+      updateValueAdjustments('totalDebt', lastYearData.totalDebt);
+      alert(`가장 최근 연도(${lastYearData.year}년)의 재무데이터를 성공적으로 불러왔습니다.\n\n- 현금 및 현금성 자산: ${lastYearData.cash.toLocaleString()}\n- 총 차입금: ${lastYearData.totalDebt.toLocaleString()}`);
     } else {
       alert('불러올 과거 재무데이터가 없습니다.');
     }
@@ -25,34 +25,56 @@ export function ValueAdjustmentTab({ valuation }: { valuation: ReturnType<typeof
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col xl:flex-row justify-between items-start gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 mb-2">가치 조정 및 리스크</h2>
           <p className="text-slate-500 text-sm">영업가치(Enterprise Value)에서 주주가치(Equity Value)를 산출하기 위한 가산/차감 항목을 입력합니다.</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
-          <button 
-            onClick={handleFetchFromHistorical}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap"
-          >
-            <Database className="w-4 h-4" />
-            최근 재무데이터 연동
-          </button>
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex gap-6">
-            <div>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">가산 항목 합계</p>
-              <p className="text-lg font-bold text-emerald-600">+{totalAdditions.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">차감 항목 합계</p>
-              <p className="text-lg font-bold text-rose-600">-{totalDeductions.toLocaleString()}</p>
-            </div>
-            <div className="border-l border-slate-200 pl-6">
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">순 가치 조정액</p>
-              <p className={`text-xl font-bold ${netAdjustment >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {netAdjustment >= 0 ? '+' : ''}{netAdjustment.toLocaleString()}
-              </p>
-            </div>
+        <button 
+          onClick={handleFetchFromHistorical}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap"
+        >
+          <Database className="w-4 h-4" />
+          최근 재무데이터 연동
+        </button>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex-1 w-full flex items-center justify-start gap-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+            <Plus className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-slate-500 font-medium mb-1 whitespace-nowrap">가산 항목 합계</p>
+            <p className="text-2xl font-bold text-emerald-600 truncate">+{totalAdditions.toLocaleString()}</p>
+          </div>
+        </div>
+        
+        <div className="hidden md:block w-px h-16 bg-slate-100 shrink-0"></div>
+        <div className="md:hidden h-px w-full bg-slate-100"></div>
+        
+        <div className="flex-1 w-full flex items-center justify-start gap-4">
+          <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
+            <Minus className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-slate-500 font-medium mb-1 whitespace-nowrap">차감 항목 합계</p>
+            <p className="text-2xl font-bold text-rose-600 truncate">-{totalDeductions.toLocaleString()}</p>
+          </div>
+        </div>
+
+        <div className="hidden md:block w-px h-16 bg-slate-100 shrink-0"></div>
+        <div className="md:hidden h-px w-full bg-slate-100"></div>
+
+        <div className="flex-1 w-full flex items-center justify-start gap-4">
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${netAdjustment >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'}`}>
+            <Calculator className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-slate-500 font-medium mb-1 whitespace-nowrap">순 가치 조정액</p>
+            <p className={`text-2xl font-bold truncate ${netAdjustment >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
+              {netAdjustment >= 0 ? '+' : ''}{netAdjustment.toLocaleString()}
+            </p>
           </div>
         </div>
       </div>

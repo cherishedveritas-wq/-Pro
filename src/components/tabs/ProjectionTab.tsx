@@ -171,7 +171,7 @@ export function ProjectionTab({ valuation }: { valuation: ReturnType<typeof useV
           </div>
           <div>
             <strong className="text-slate-800 block mb-1">시나리오 (Scenarios)</strong>
-            노동집약, 기술집약, 단순노무서비스 상황을 가정하여 변수들의 변화에 따른 가치 변동을 분석할 수 있습니다.
+            노동집약, 기술집약, 사업지원서비스 상황을 가정하여 변수들의 변화에 따른 가치 변동을 분석할 수 있습니다.
           </div>
         </div>
       </div>

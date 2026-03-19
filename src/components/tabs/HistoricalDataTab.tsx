@@ -112,6 +112,8 @@ export function HistoricalDataTab({ valuation }: { valuation: ReturnType<typeof 
               { key: 'cash', label: '현금 및 현금성 자산 (Cash)' },
               { key: 'currentLiabilities', label: '유동부채 (Current Liabilities)' },
               { key: 'shortTermDebt', label: '단기차입금 (Short-term Debt)' },
+              { key: 'totalDebt', label: '총차입금 (Total Debt)' },
+              { key: 'totalEquity', label: '총자본 (Total Equity)' },
               { key: 'ppe', label: '유형자산 (PP&E)' },
             ].map((row) => (
               <tr key={row.key} className="hover:bg-slate-50 transition-colors">

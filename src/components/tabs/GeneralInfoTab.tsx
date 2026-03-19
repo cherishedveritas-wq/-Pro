@@ -86,13 +86,20 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
           return new Promise<any>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-              const base64Data = (reader.result as string).split(',')[1];
-              resolve({
-                inlineData: {
-                  mimeType: file.type || 'application/pdf',
-                  data: base64Data
+              try {
+                if (!reader.result) {
+                  throw new Error("파일을 읽을 수 없습니다.");
                 }
-              });
+                const base64Data = (reader.result as string).split(',')[1];
+                resolve({
+                  inlineData: {
+                    mimeType: file.type || 'application/pdf',
+                    data: base64Data
+                  }
+                });
+              } catch (err) {
+                reject(err);
+              }
             };
             reader.onerror = reject;
             reader.readAsDataURL(file);
@@ -110,69 +117,82 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
       // Cache buster: 2026-03-18
       const ai = new GoogleGenAI({ apiKey });
       
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: {
-          parts: [
-            ...fileParts,
-            {
-              text: `Extract the company name, industry, and financial data for the last 3 years from the provided document(s).
-              If multiple documents are provided, combine the data to find the 3 most recent distinct years available.
-              If there are still fewer than 3 years, extrapolate or leave as 0.
-              Return an object containing:
-              - companyName: The name of the company (기업명).
-              - industry: The industry the company belongs to (산업군). Choose one of: "IT/기술", "서비스업", "헬스케어", "금융", "자유소비재", "산업재", "에너지". If unsure, default to "서비스업".
-              - historicalData: A JSON array of exactly 3 objects, ordered from oldest year to most recent year.
-              - year0Ppe: The property, plant, and equipment (유형자산) value for the year immediately preceding the oldest year in historicalData (i.e., Year - 4). If not available, leave as 0.
-              
-              Map the document's items to these fields for each year in historicalData:
-              - year: The fiscal year
-              - revenue: 매출액 (Revenue)
-              - cogs: 매출원가 (COGS)
-              - sga: 판매비와 관리비 (SG&A)
-              - da: 감가상각비 (D&A)
-              - taxes: 법인세 (Taxes)
-              - currentAssets: 유동자산 (Current Assets)
-              - cash: 현금 및 현금성 자산 (Cash)
-              - currentLiabilities: 유동부채 (Current Liabilities)
-              - shortTermDebt: 단기차입금 (Short-term Debt)
-              - ppe: 유형자산 (PP&E)`
-            }
-          ]
-        },
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              companyName: { type: Type.STRING },
-              industry: { type: Type.STRING },
-              historicalData: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    year: { type: Type.INTEGER },
-                    revenue: { type: Type.NUMBER },
-                    cogs: { type: Type.NUMBER },
-                    sga: { type: Type.NUMBER },
-                    da: { type: Type.NUMBER },
-                    taxes: { type: Type.NUMBER },
-                    currentAssets: { type: Type.NUMBER },
-                    cash: { type: Type.NUMBER },
-                    currentLiabilities: { type: Type.NUMBER },
-                    shortTermDebt: { type: Type.NUMBER },
-                    ppe: { type: Type.NUMBER },
-                  },
-                  required: ["year", "revenue", "cogs", "sga", "da", "taxes", "currentAssets", "cash", "currentLiabilities", "shortTermDebt", "ppe"]
-                }
-              },
-              year0Ppe: { type: Type.NUMBER, description: "The PPE value for the year immediately preceding the oldest year in historicalData" }
-            },
-            required: ["historicalData", "year0Ppe"]
-          }
-        }
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('AI 분석 시간이 초과되었습니다. (제한 시간: 60초)\n파일 크기가 너무 크거나 서버 응답이 지연되고 있을 수 있습니다.')), 60000);
       });
+
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: {
+            parts: [
+              ...fileParts,
+              {
+                text: `Extract the company name, industry, and financial data for the last 3 years from the provided document(s).
+                If multiple documents are provided, combine the data to find the 3 most recent distinct years available.
+                If there are still fewer than 3 years, extrapolate or leave as 0.
+                Return an object containing:
+                - companyName: The name of the company (기업명).
+                - industry: The industry the company belongs to (산업군). Choose one of: "IT/기술", "서비스업", "헬스케어", "금융", "자유소비재", "산업재", "에너지". If unsure, default to "서비스업".
+                - historicalData: A JSON array of exactly 3 objects, ordered from oldest year to most recent year.
+                - year0Ppe: The property, plant, and equipment (유형자산) value for the year immediately preceding the oldest year in historicalData (i.e., Year - 4). If not available, leave as 0.
+                
+                Map the document's items to these fields for each year in historicalData:
+                - year: The fiscal year
+                - revenue: 매출액 (Revenue)
+                - cogs: 매출원가 (COGS)
+                - sga: 판매비와 관리비 (SG&A)
+                - da: 감가상각비 (D&A). IMPORTANT: This must be the sum of '감가상각비' (Depreciation) and '무형자산상각비' (Amortization) from the cash flow statement or income statement. Look carefully for both.
+                - daBreakdown: A string explaining the exact numbers found in the document that were summed to calculate 'da' (e.g., "감가상각비: 100,000 + 무형자산상각비: 28,843,130 = 128,843,130").
+                - taxes: 법인세 (Taxes)
+                - currentAssets: 유동자산 (Current Assets)
+                - cash: 현금 및 현금성 자산 (Cash)
+                - currentLiabilities: 유동부채 (Current Liabilities)
+                - shortTermDebt: 단기차입금 (Short-term Debt)
+                - totalDebt: 총차입금 (Total Debt = 단기차입금 + 장기차입금 + 유동성장기부채 등 모든 이자발생부채의 합)
+                - totalEquity: 총자본 (Total Equity / 자본총계)
+                - ppe: 유형자산 (PP&E)`
+              }
+            ]
+          },
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                companyName: { type: Type.STRING },
+                industry: { type: Type.STRING },
+                historicalData: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      year: { type: Type.INTEGER },
+                      revenue: { type: Type.NUMBER },
+                      cogs: { type: Type.NUMBER },
+                      sga: { type: Type.NUMBER },
+                      da: { type: Type.NUMBER },
+                      daBreakdown: { type: Type.STRING },
+                      taxes: { type: Type.NUMBER },
+                      currentAssets: { type: Type.NUMBER },
+                      cash: { type: Type.NUMBER },
+                      currentLiabilities: { type: Type.NUMBER },
+                      shortTermDebt: { type: Type.NUMBER },
+                      totalDebt: { type: Type.NUMBER },
+                      totalEquity: { type: Type.NUMBER },
+                      ppe: { type: Type.NUMBER },
+                    },
+                    required: ["year", "revenue", "cogs", "sga", "da", "daBreakdown", "taxes", "currentAssets", "cash", "currentLiabilities", "shortTermDebt", "totalDebt", "totalEquity", "ppe"]
+                  }
+                },
+                year0Ppe: { type: Type.NUMBER, description: "The PPE value for the year immediately preceding the oldest year in historicalData" }
+              },
+              required: ["historicalData", "year0Ppe"]
+            }
+          }
+        }),
+        timeoutPromise
+      ]);
 
       const jsonStr = response.text?.trim() || '{}';
       const parsedData = JSON.parse(jsonStr);
@@ -185,11 +205,15 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
       }
 
       if (parsedData.historicalData && Array.isArray(parsedData.historicalData) && parsedData.historicalData.length === 3) {
+        let breakdownMsg = '';
         parsedData.historicalData.forEach((data: any, idx: number) => {
+          if (data.daBreakdown) {
+            breakdownMsg += `\n- ${data.year}년: ${data.daBreakdown}`;
+          }
           Object.keys(data).forEach((key) => {
-            if (key !== 'year') {
+            if (key !== 'year' && key !== 'daBreakdown') {
               updateHistoricalYear(idx, key as any, data[key]);
-            } else {
+            } else if (key === 'year') {
               updateHistoricalYear(idx, 'year', data[key]);
             }
           });
@@ -199,7 +223,7 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
           updateGeneralInfo('year0Ppe', parsedData.year0Ppe);
         }
         
-        alert('AI 분석이 완료되어 데이터가 자동 입력되었습니다.');
+        alert(`AI 분석이 완료되어 데이터가 자동 입력되었습니다.${breakdownMsg ? '\n\n[D&A(감가상각비) 산출 근거]' + breakdownMsg : ''}`);
       } else {
         throw new Error('Invalid data format received from AI');
       }

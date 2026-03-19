@@ -93,7 +93,7 @@ export default function App() {
               >
                 <option value="기술집약">기술집약</option>
                 <option value="노동집약">노동집약</option>
-                <option value="단순노무서비스">단순노무서비스</option>
+                <option value="사업지원서비스">사업지원서비스</option>
               </select>
             </div>
             <button 

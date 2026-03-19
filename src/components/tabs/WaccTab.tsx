@@ -42,20 +42,16 @@ export function WaccTab({ valuation }: { valuation: ReturnType<typeof useValuati
   const handleCalculateDebtRatio = () => {
     if (historicalData && historicalData.length > 0) {
       const lastYearData = historicalData[historicalData.length - 1];
-      // 자본 = 자산 - 부채
-      // 자산은 유동자산 + 비유동자산(유형자산 등)으로 추정해야 하나, 
-      // 입력된 데이터 한계상 (유동자산 + 유형자산)을 최소 자산으로 가정
-      const estimatedAssets = lastYearData.currentAssets + lastYearData.ppe;
-      const estimatedEquity = estimatedAssets - lastYearData.currentLiabilities;
       
-      if (estimatedEquity > 0 && lastYearData.shortTermDebt >= 0) {
-        // 부채비율 = (총차입금 / 자본) * 100
-        // 여기서는 입력된 단기차입금을 총차입금의 대용치로 사용
-        const calculatedRatio = (lastYearData.shortTermDebt / estimatedEquity) * 100;
+      const estimatedEquity = lastYearData.totalEquity;
+      
+      if (estimatedEquity > 0 && lastYearData.totalDebt >= 0) {
+        // 차입금비율 = (총차입금 / 총자본) * 100
+        const calculatedRatio = (lastYearData.totalDebt / estimatedEquity) * 100;
         updateWacc(scenario, 'debtToEquityRatio', Number(calculatedRatio.toFixed(1)));
-        alert(`가장 최근 연도(${lastYearData.year}년) 데이터를 기반으로 부채비율을 계산했습니다.\n\n- 추정 자본: ${estimatedEquity.toLocaleString()}\n- 차입금: ${lastYearData.shortTermDebt.toLocaleString()}\n- 산출된 부채비율: ${calculatedRatio.toFixed(1)}%`);
+        alert(`가장 최근 연도(${lastYearData.year}년) 데이터를 기반으로 차입금비율을 계산했습니다.\n\n- 총자본: ${estimatedEquity.toLocaleString()}\n- 총차입금: ${lastYearData.totalDebt.toLocaleString()}\n- 산출된 차입금비율: ${calculatedRatio.toFixed(1)}%`);
       } else {
-        alert("자본이 0 이하이거나 부채 데이터가 부족하여 부채비율을 계산할 수 없습니다.");
+        alert("자본이 0 이하이거나 차입금 데이터가 부족하여 차입금비율을 계산할 수 없습니다.\n과거 재무 데이터 탭에서 총자본과 총차입금을 확인해주세요.");
       }
     } else {
       alert("과거 재무 데이터가 없습니다.");
@@ -131,7 +127,7 @@ export function WaccTab({ valuation }: { valuation: ReturnType<typeof useValuati
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
             >
               <Calculator className="w-3.5 h-3.5" />
-              과거 데이터로 부채비율 계산
+              과거 데이터로 차입금비율 계산
             </button>
           </div>
           <Input
@@ -144,13 +140,13 @@ export function WaccTab({ valuation }: { valuation: ReturnType<typeof useValuati
             tooltip="기업이 차입금에 대해 지불하는 이자율입니다."
           />
           <Input
-            label="부채비율 (D/E Ratio)"
+            label="목표 차입금비율 (D/E Ratio)"
             type="number"
             step="1"
             value={currentWacc.debtToEquityRatio}
             onChange={(e) => updateWacc(scenario, 'debtToEquityRatio', Number(e.target.value))}
             suffix="%"
-            tooltip="목표 자본 구조입니다."
+            tooltip="목표 자본 구조입니다. (총차입금 / 자기자본)"
           />
         </div>
       </div>

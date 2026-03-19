@@ -1,4 +1,4 @@
-export type Scenario = '기술집약' | '노동집약' | '단순노무서비스';
+export type Scenario = '기술집약' | '노동집약' | '사업지원서비스';
 
 export interface GeneralInfo {
   companyName: string;
@@ -33,6 +33,8 @@ export interface HistoricalYear {
   cash: number;
   currentLiabilities: number;
   shortTermDebt: number;
+  totalDebt: number;
+  totalEquity: number;
   ppe: number;
 }
 

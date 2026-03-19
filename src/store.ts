@@ -104,15 +104,15 @@ export const calculateHistoricalAverages = (hd: ValuationState['historicalData']
 };
 
 const initialHistoricalData = [
-  { year: currentYear - 3, revenue: 0, cogs: 0, sga: 0, da: 0, taxes: 0, currentAssets: 0, cash: 0, currentLiabilities: 0, shortTermDebt: 0, ppe: 0 },
-  { year: currentYear - 2, revenue: 0, cogs: 0, sga: 0, da: 0, taxes: 0, currentAssets: 0, cash: 0, currentLiabilities: 0, shortTermDebt: 0, ppe: 0 },
-  { year: currentYear - 1, revenue: 0, cogs: 0, sga: 0, da: 0, taxes: 0, currentAssets: 0, cash: 0, currentLiabilities: 0, shortTermDebt: 0, ppe: 0 },
+  { year: currentYear - 3, revenue: 0, cogs: 0, sga: 0, da: 0, taxes: 0, currentAssets: 0, cash: 0, currentLiabilities: 0, shortTermDebt: 0, totalDebt: 0, totalEquity: 0, ppe: 0 },
+  { year: currentYear - 2, revenue: 0, cogs: 0, sga: 0, da: 0, taxes: 0, currentAssets: 0, cash: 0, currentLiabilities: 0, shortTermDebt: 0, totalDebt: 0, totalEquity: 0, ppe: 0 },
+  { year: currentYear - 1, revenue: 0, cogs: 0, sga: 0, da: 0, taxes: 0, currentAssets: 0, cash: 0, currentLiabilities: 0, shortTermDebt: 0, totalDebt: 0, totalEquity: 0, ppe: 0 },
 ];
 
 const baseAverages = calculateHistoricalAverages(initialHistoricalData, 0);
 
 const initialState: ValuationState = {
-  scenario: '단순노무서비스',
+  scenario: '사업지원서비스',
   generalInfo: {
     companyName: '',
     industry: '서비스업',
@@ -136,12 +136,12 @@ const initialState: ValuationState = {
   projections: {
     '기술집약': { ...baseAverages, revenueGrowthRate: baseAverages.revenueGrowthRate + 5, operatingMargin: baseAverages.operatingMargin + 5, terminalGrowthRate: 3 },
     '노동집약': { ...baseAverages, terminalGrowthRate: 2 },
-    '단순노무서비스': { ...baseAverages, revenueGrowthRate: baseAverages.revenueGrowthRate - 5, operatingMargin: baseAverages.operatingMargin - 5, terminalGrowthRate: 1 },
+    '사업지원서비스': { ...baseAverages, revenueGrowthRate: baseAverages.revenueGrowthRate - 5, operatingMargin: baseAverages.operatingMargin - 5, terminalGrowthRate: 1 },
   },
   wacc: {
     '기술집약': { riskFreeRate: 3, beta: 1.0, marketRiskPremium: 5, costOfDebt: 4, debtToEquityRatio: 30 },
     '노동집약': { riskFreeRate: 4, beta: 1.2, marketRiskPremium: 6, costOfDebt: 5, debtToEquityRatio: 40 },
-    '단순노무서비스': { riskFreeRate: 5, beta: 1.5, marketRiskPremium: 7, costOfDebt: 6, debtToEquityRatio: 50 },
+    '사업지원서비스': { riskFreeRate: 5, beta: 1.5, marketRiskPremium: 7, costOfDebt: 6, debtToEquityRatio: 50 },
   },
 };
 
@@ -200,7 +200,7 @@ export function useValuation() {
       projections: {
         '기술집약': { ...s.projections['기술집약'], ...avgs, revenueGrowthRate: avgs.revenueGrowthRate + 5, operatingMargin: avgs.operatingMargin + 5 },
         '노동집약': { ...s.projections['노동집약'], ...avgs },
-        '단순노무서비스': { ...s.projections['단순노무서비스'], ...avgs, revenueGrowthRate: avgs.revenueGrowthRate - 5, operatingMargin: avgs.operatingMargin - 5 },
+        '사업지원서비스': { ...s.projections['사업지원서비스'], ...avgs, revenueGrowthRate: avgs.revenueGrowthRate - 5, operatingMargin: avgs.operatingMargin - 5 },
       }
     }));
   };
@@ -275,7 +275,7 @@ export function useValuation() {
       all: {
         '기술집약': calculateForScenario('기술집약'),
         '노동집약': calculateForScenario('노동집약'),
-        '단순노무서비스': calculateForScenario('단순노무서비스'),
+        '사업지원서비스': calculateForScenario('사업지원서비스'),
       }
     };
   }, [state]);
