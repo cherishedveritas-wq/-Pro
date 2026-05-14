@@ -80,15 +80,49 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
         windowWidth: element.scrollWidth,
         windowHeight: element.scrollHeight,
         onclone: (clonedDoc) => {
+          // 1. Process all <style> tags
           const styles = clonedDoc.getElementsByTagName('style');
           for (let i = 0; i < styles.length; i++) {
             const style = styles[i];
             if (style.innerHTML.includes('oklch')) {
-              // Replace oklch with a fallback color (indigo-600 approx #6366f1) 
-              // to prevent html2canvas parser from crashing
               style.innerHTML = style.innerHTML.replace(/oklch\([^)]+\)/g, '#6366f1');
             }
           }
+          
+          // 2. Process all <link> stylesheets by converting them to <style> tags if they are accessible
+          // but more reliably, we can just add a global override style at the end of head
+          const overrideStyle = clonedDoc.createElement('style');
+          overrideStyle.innerHTML = `
+            * { 
+              color: inherit !important; 
+              border-color: #e2e8f0 !important;
+              background-color: transparent !important;
+            }
+            .bg-indigo-600 { background-color: #4f46e5 !important; }
+            .text-indigo-600 { color: #4f46e5 !important; }
+            .bg-slate-50 { background-color: #f8fafc !important; }
+            .bg-white { background-color: #ffffff !important; }
+            .border-slate-200 { border-color: #e2e8f0 !important; }
+            /* Add more manual overrides for common tailwind classes that might use oklch */
+          `;
+          clonedDoc.head.appendChild(overrideStyle);
+
+          // 3. Most importantly, reach into the actual style sheets if available
+          try {
+            for (let i = 0; i < clonedDoc.styleSheets.length; i++) {
+              const sheet = clonedDoc.styleSheets[i] as CSSStyleSheet;
+              try {
+                for (let j = 0; j < sheet.cssRules.length; j++) {
+                  const rule = sheet.cssRules[j] as CSSStyleRule;
+                  if (rule.style && rule.style.cssText.includes('oklch')) {
+                    rule.style.cssText = rule.style.cssText.replace(/oklch\([^)]+\)/g, '#6366f1');
+                  }
+                }
+              } catch (e) {
+                // cross-origin stylesheets might throw error here
+              }
+            }
+          } catch (e) {}
         }
       });
       
