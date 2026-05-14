@@ -1,5 +1,3 @@
-export type Scenario = '기술집약' | '노동집약' | '사업지원서비스';
-
 export interface GeneralInfo {
   companyName: string;
   industry: string;
@@ -57,13 +55,12 @@ export interface WaccAssumptions {
 }
 
 export interface ValuationState {
-  scenario: Scenario;
   generalInfo: GeneralInfo;
   industryMultiples: IndustryMultiples;
   valueAdjustments: ValueAdjustments;
   historicalData: HistoricalYear[];
-  projections: Record<Scenario, ProjectionAssumptions>;
-  wacc: Record<Scenario, WaccAssumptions>;
+  projections: ProjectionAssumptions;
+  wacc: WaccAssumptions;
 }
 
 export interface CalculatedYear {

@@ -32,31 +32,31 @@ export function HistoricalDataTab({ valuation }: { valuation: ReturnType<typeof 
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 mb-2">과거 재무 데이터</h2>
           <p className="text-slate-500 text-sm">최근 3개년의 재무 실적을 입력합니다.</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex gap-6">
+        <div className="w-full lg:w-auto">
+          <div className="bg-indigo-50 p-3 md:p-4 rounded-xl border border-indigo-100 flex justify-between sm:justify-start gap-4 md:gap-6">
             <div>
-              <p className="text-xs text-indigo-600 font-medium uppercase tracking-wider">매출액 CAGR</p>
-              <p className="text-xl font-bold text-indigo-900">{revenueCagr.toFixed(1)}%</p>
+              <p className="text-[10px] md:text-xs text-indigo-600 font-medium uppercase tracking-wider">매출액 CAGR</p>
+              <p className="text-lg md:text-xl font-bold text-indigo-900">{revenueCagr.toFixed(1)}%</p>
             </div>
             <div>
-              <p className="text-xs text-indigo-600 font-medium uppercase tracking-wider">최근 EBITDA 이익률</p>
-              <p className="text-xl font-bold text-indigo-900">{ebitdaMargin.toFixed(1)}%</p>
+              <p className="text-[10px] md:text-xs text-indigo-600 font-medium uppercase tracking-wider">EBITDA 이익률</p>
+              <p className="text-lg md:text-xl font-bold text-indigo-900">{ebitdaMargin.toFixed(1)}%</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+      <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div className="flex-1">
           <h3 className="text-sm font-medium text-slate-900">최초 연도 CAPEX 계산을 위한 기초 데이터</h3>
           <p className="text-xs text-slate-500">1차년도 자본적지출(CAPEX) 계산을 위해 그 전년도의 유형자산 값이 필요합니다.</p>
         </div>
-        <div className="w-48">
+        <div className="w-full sm:w-48">
           <FormattedNumberInput
             label={`전기(${historicalData[0].year - 1}년) 유형자산`}
             value={generalInfo.year0Ppe}
@@ -65,8 +65,10 @@ export function HistoricalDataTab({ valuation }: { valuation: ReturnType<typeof 
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+      <div className="relative">
+        <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white pointer-events-none md:hidden" />
+        <div className="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
+          <table className="w-full text-left border-collapse min-w-[600px]">
           <thead>
             <tr>
               <th className="p-3 border-b-2 border-slate-200 font-semibold text-slate-700">항목 ({generalInfo.currency})</th>
@@ -150,8 +152,9 @@ export function HistoricalDataTab({ valuation }: { valuation: ReturnType<typeof 
           </tbody>
         </table>
       </div>
+    </div>
 
-      {/* Guide Section */}
+    {/* Guide Section */}
       <div className="mt-8 bg-slate-50 p-6 rounded-2xl border border-slate-200">
         <h3 className="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
           <Info className="w-5 h-5 text-indigo-600" />

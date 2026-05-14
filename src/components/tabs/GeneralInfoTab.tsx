@@ -6,7 +6,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import * as XLSX from 'xlsx';
 
 export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof useValuation> }) {
-  const { state, updateGeneralInfo, updateIndustryMultiples, updateHistoricalYear } = valuation;
+  const { state, updateGeneralInfo, updateIndustryMultiples, updateHistoricalYear, updateValueAdjustments, updateAllHistoricalData } = valuation;
   const { generalInfo, industryMultiples, historicalData } = state;
   const [isFetching, setIsFetching] = useState(false);
   const [fetchSuccess, setFetchSuccess] = useState(false);
@@ -52,7 +52,7 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []) as File[];
     if (files.length === 0) return;
 
     setIsAnalyzing(true);
@@ -118,7 +118,7 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
       const ai = new GoogleGenAI({ apiKey });
       
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('AI 분석 시간이 초과되었습니다. (제한 시간: 60초)\n파일 크기가 너무 크거나 서버 응답이 지연되고 있을 수 있습니다.')), 60000);
+        setTimeout(() => reject(new Error('AI 분석 시간이 초과되었습니다. (제한 시간: 180초)\n파일 크기가 너무 크거나 서버 응답이 지연되고 있을 수 있습니다.')), 180000);
       });
 
       const response = await Promise.race([
@@ -205,25 +205,51 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
       }
 
       if (parsedData.historicalData && Array.isArray(parsedData.historicalData) && parsedData.historicalData.length === 3) {
+        // AI가 반환한 데이터를 HistoricalYear 타입에 맞게 가공
+        const newHistoricalData = parsedData.historicalData.map((data: any) => {
+          const cleanedData: any = { year: typeof data.year === 'number' ? data.year : (parseInt(String(data.year)) || 0) };
+          
+          // 모든 필수 필드를 숫자로 변환하여 할당
+          const fields = [
+            'revenue', 'cogs', 'sga', 'da', 'taxes', 'currentAssets', 
+            'cash', 'currentLiabilities', 'shortTermDebt', 'totalDebt', 
+            'totalEquity', 'ppe'
+          ];
+          
+          fields.forEach(field => {
+            const val = data[field];
+            cleanedData[field] = typeof val === 'number' ? val : (parseFloat(String(val)) || 0);
+          });
+          
+          return cleanedData;
+        });
+
+        // 벌크 업데이트 수행
+        updateAllHistoricalData(newHistoricalData);
+
         let breakdownMsg = '';
-        parsedData.historicalData.forEach((data: any, idx: number) => {
+        parsedData.historicalData.forEach((data: any) => {
           if (data.daBreakdown) {
             breakdownMsg += `\n- ${data.year}년: ${data.daBreakdown}`;
           }
-          Object.keys(data).forEach((key) => {
-            if (key !== 'year' && key !== 'daBreakdown') {
-              updateHistoricalYear(idx, key as any, data[key]);
-            } else if (key === 'year') {
-              updateHistoricalYear(idx, 'year', data[key]);
-            }
-          });
         });
         
+        const lastYearIdx = parsedData.historicalData.length - 1;
+        const lastYearData = parsedData.historicalData[lastYearIdx];
+
+        // 가치 조정 항목 자동 업데이트 (최근 연도 기준)
+        if (lastYearData.cash !== undefined) {
+          updateValueAdjustments('cashAndEquivalents', typeof lastYearData.cash === 'number' ? lastYearData.cash : (parseFloat(String(lastYearData.cash)) || 0));
+        }
+        if (lastYearData.totalDebt !== undefined) {
+          updateValueAdjustments('totalDebt', typeof lastYearData.totalDebt === 'number' ? lastYearData.totalDebt : (parseFloat(String(lastYearData.totalDebt)) || 0));
+        }
+
         if (parsedData.year0Ppe !== undefined) {
-          updateGeneralInfo('year0Ppe', parsedData.year0Ppe);
+          updateGeneralInfo('year0Ppe', typeof parsedData.year0Ppe === 'number' ? parsedData.year0Ppe : (parseFloat(String(parsedData.year0Ppe)) || 0));
         }
         
-        alert(`AI 분석이 완료되어 데이터가 자동 입력되었습니다.${breakdownMsg ? '\n\n[D&A(감가상각비) 산출 근거]' + breakdownMsg : ''}`);
+        alert(`AI 분석이 완료되어 데이터가 자동 입력되었습니다.${breakdownMsg ? '\n\n[D&A(감가상각비) 산출 근거]' + breakdownMsg : ''}\n\n[참고] 최근 연도(${lastYearData.year}년)의 현금 및 차입금 데이터가 가치 조정 항목에 자동 반영되었습니다.`);
       } else {
         throw new Error('Invalid data format received from AI');
       }
@@ -238,13 +264,13 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 mb-2">기본 정보</h2>
           <p className="text-slate-500 text-sm">대상 기업의 기본 정보 및 가치평가 기준을 입력합니다.</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col w-full lg:w-auto gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -253,32 +279,32 @@ export function GeneralInfoTab({ valuation }: { valuation: ReturnType<typeof use
               multiple
               className="hidden" 
             />
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col flex-1">
               <button 
                 onClick={handleImportClick}
                 disabled={isAnalyzing}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 w-full"
               >
                 {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 {isAnalyzing ? 'AI 분석 중...' : 'Excel/PDF 불러오기'}
               </button>
-              <span className="text-xs text-slate-500 mt-1">💡 2개 파일을 한 번에 등록할 수 있습니다.</span>
+              <span className="hidden sm:block text-[10px] text-slate-500 mt-1 text-center">💡 2개 파일을 한 번에 등록할 수 있습니다.</span>
             </div>
             <button 
               onClick={handleFetchMultiples}
               disabled={isFetching}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 h-[38px] self-start"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 h-[44px] sm:h-[40px]"
             >
               <Database className={`w-4 h-4 ${isFetching ? 'animate-pulse' : ''}`} />
-              산업 평균 멀티플 불러오기
+              산업 평균 멀티플
             </button>
           </div>
-          <div className="text-xs text-slate-500 flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-md border border-slate-200 mt-2">
-            <span className="font-medium text-slate-700">적용중인 멀티플:</span>
-            <span>EV/EBITDA {industryMultiples.evEbitda[0]}x~{industryMultiples.evEbitda[1]}x</span>
-            <span className="text-slate-300">|</span>
-            <span>P/E {industryMultiples.pe[0]}x~{industryMultiples.pe[1]}x</span>
-            {fetchSuccess && <span className="text-emerald-600 font-medium ml-1 animate-pulse">(업데이트 완료!)</span>}
+          <div className="text-[11px] sm:text-xs text-slate-500 flex flex-wrap items-center gap-2 bg-slate-50 px-3 py-2 rounded-md border border-slate-200">
+            <span className="font-medium text-slate-700">현재 멀티플:</span>
+            <span>EV/EBITDA {industryMultiples.evEbitda[0]}~{industryMultiples.evEbitda[1]}x</span>
+            <span className="hidden sm:inline text-slate-300">|</span>
+            <span>P/E {industryMultiples.pe[0]}~{industryMultiples.pe[1]}x</span>
+            {fetchSuccess && <span className="text-emerald-600 font-medium ml-1 animate-pulse">✓</span>}
           </div>
         </div>
       </div>

@@ -75,27 +75,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-2 rounded-lg">
-              <BarChart3 className="w-5 h-5 text-white" />
+            <div className="bg-indigo-600 p-1.5 md:p-2 rounded-lg">
+              <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
-            <h1 className="text-xl font-semibold text-slate-900">기업가치평가 Pro</h1>
+            <h1 className="text-lg md:text-xl font-semibold text-slate-900 truncate">기업가치평가 Pro</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 border-r border-slate-200 pr-4">
-              <span className="text-sm text-slate-500">시나리오:</span>
-              <select 
-                className="bg-slate-100 border-none text-sm rounded-md focus:ring-2 focus:ring-indigo-500 py-1.5 pl-3 pr-8 font-medium text-slate-700"
-                value={valuation.state.scenario}
-                onChange={(e) => valuation.setScenario(e.target.value as any)}
-              >
-                <option value="기술집약">기술집약</option>
-                <option value="노동집약">노동집약</option>
-                <option value="사업지원서비스">사업지원서비스</option>
-              </select>
-            </div>
+          <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsLocked(true)}
               className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -107,11 +95,11 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Sidebar Navigation */}
-          <nav className="w-full md:w-64 shrink-0">
-            <div className="flex flex-row md:flex-col gap-2 overflow-x-auto pb-4 md:pb-0">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+          {/* Scrollable Navigation on Mobile, Sidebar on Desktop */}
+          <nav className="w-full md:w-64 shrink-0 overflow-hidden sticky top-16 md:top-24 z-10 bg-slate-50 py-2 -mx-4 px-4 md:mx-0 md:px-0 md:bg-transparent">
+            <div className="flex flex-row md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide no-scrollbar flex-nowrap items-center">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -119,13 +107,13 @@ export default function App() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+                    className={`flex items-center gap-2 md:gap-3 px-3 py-2 md:px-4 md:py-3 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap ${
                       isActive 
                         ? 'bg-indigo-600 text-white shadow-md' 
-                        : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                        : 'bg-white md:bg-transparent border border-slate-200 md:border-transparent text-slate-600 hover:bg-slate-200 hover:text-slate-900'
                     }`}
                   >
-                    <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-100' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 md:w-5 md:h-5 ${isActive ? 'text-indigo-100' : 'text-slate-400'}`} />
                     {tab.label}
                   </button>
                 );
@@ -134,7 +122,7 @@ export default function App() {
           </nav>
 
           {/* Main Content Area */}
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px]">
+          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}

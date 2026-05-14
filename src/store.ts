@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
-import { ValuationState, Scenario, CalculatedYear } from './types';
+import { ValuationState, CalculatedYear } from './types';
 
 const currentYear = new Date().getFullYear();
 
 export const calculateHistoricalAverages = (hd: ValuationState['historicalData'], year0Ppe: number) => {
-  if (hd.length < 2) return { revenueGrowthRate: 2.9, operatingMargin: 15, daPercentOfRevenue: 5, capexPercentOfRevenue: 10, nwcPercentOfRevenue: 12, taxRate: 20.9 };
+  if (hd.length < 2) return { revenueGrowthRate: 2.9, operatingMargin: 15, daPercentOfRevenue: 5, capexPercentOfRevenue: 10, nwcPercentOfRevenue: 12, taxRate: 20.9, terminalGrowthRate: 2 };
   
   const revenueCagr = hd[0].revenue > 0 && hd[hd.length - 1].revenue > 0
     ? (Math.pow(hd[hd.length - 1].revenue / hd[0].revenue, 1 / (hd.length - 1)) - 1) * 100
@@ -50,31 +50,25 @@ export const calculateHistoricalAverages = (hd: ValuationState['historicalData']
   let avgDaPercent = sumDaPercent / divisor;
   let avgNwcPercent = sumNwcPercent / divisor;
   
-  // CAPEX가 음수(자산매각이 더 많음)인 경우, 영구적으로 자산을 매각할 수는 없으므로
-  // 보수적 추정을 위해 최소한 감가상각비(D&A)만큼은 재투자(Maintenance CAPEX)한다고 가정
   if (avgCapexPercent < 0) {
     avgCapexPercent = avgDaPercent;
   }
   
-  // 순운전자본이 음수인 경우(매입채무가 매우 큰 경우 등),
-  // 미래에도 계속 음수 폭이 커지면 무한히 현금이 창출되는 오류가 발생하므로 0%로 보정
   if (avgNwcPercent < 0) {
     avgNwcPercent = 0;
   }
 
-  // 법인세율 자동 산출 (최근 연도 영업이익 기준, 2023년 개정 법인세율 적용)
   const recentYear = hd[hd.length - 1];
   const recentEbit = recentYear.revenue - recentYear.cogs - recentYear.sga;
-  let calculatedTaxRate = 20.9; // 기본값 (지방소득세 포함)
+  let calculatedTaxRate = 20.9;
 
   if (recentEbit > 0) {
-    // 입력 단위 추정: 매출액이 1억 미만이면 백만원 단위, 1000억 미만이면 천원 단위로 가정하여 과세표준(원 단위) 환산
     let normalizedEbit = recentEbit;
     if (recentYear.revenue > 0) {
       if (recentYear.revenue < 100_000) {
-        normalizedEbit = recentEbit * 1_000_000; // 백만원 단위로 가정
+        normalizedEbit = recentEbit * 1_000_000;
       } else if (recentYear.revenue < 100_000_000) {
-        normalizedEbit = recentEbit * 1_000; // 천원 단위로 가정
+        normalizedEbit = recentEbit * 1_000;
       }
     }
 
@@ -89,7 +83,7 @@ export const calculateHistoricalAverages = (hd: ValuationState['historicalData']
       taxAmount = 200_000_000 * 0.09 + 19_800_000_000 * 0.19 + 280_000_000_000 * 0.21 + (normalizedEbit - 300_000_000_000) * 0.24;
     }
     
-    const localTax = taxAmount * 0.1; // 지방소득세 10%
+    const localTax = taxAmount * 0.1;
     calculatedTaxRate = ((taxAmount + localTax) / normalizedEbit) * 100;
   }
   
@@ -100,6 +94,7 @@ export const calculateHistoricalAverages = (hd: ValuationState['historicalData']
     capexPercentOfRevenue: Number(avgCapexPercent.toFixed(2)),
     nwcPercentOfRevenue: Number(avgNwcPercent.toFixed(2)),
     taxRate: Number(calculatedTaxRate.toFixed(2)),
+    terminalGrowthRate: 2,
   };
 };
 
@@ -112,7 +107,6 @@ const initialHistoricalData = [
 const baseAverages = calculateHistoricalAverages(initialHistoricalData, 0);
 
 const initialState: ValuationState = {
-  scenario: '사업지원서비스',
   generalInfo: {
     companyName: '',
     industry: '서비스업',
@@ -133,16 +127,8 @@ const initialState: ValuationState = {
     contingentLiabilities: 0,
   },
   historicalData: initialHistoricalData,
-  projections: {
-    '기술집약': { ...baseAverages, revenueGrowthRate: baseAverages.revenueGrowthRate + 5, operatingMargin: baseAverages.operatingMargin + 5, terminalGrowthRate: 3 },
-    '노동집약': { ...baseAverages, terminalGrowthRate: 2 },
-    '사업지원서비스': { ...baseAverages, revenueGrowthRate: baseAverages.revenueGrowthRate - 5, operatingMargin: baseAverages.operatingMargin - 5, terminalGrowthRate: 1 },
-  },
-  wacc: {
-    '기술집약': { riskFreeRate: 3, beta: 1.0, marketRiskPremium: 5, costOfDebt: 4, debtToEquityRatio: 30 },
-    '노동집약': { riskFreeRate: 4, beta: 1.2, marketRiskPremium: 6, costOfDebt: 5, debtToEquityRatio: 40 },
-    '사업지원서비스': { riskFreeRate: 5, beta: 1.5, marketRiskPremium: 7, costOfDebt: 6, debtToEquityRatio: 50 },
-  },
+  projections: { ...baseAverages },
+  wacc: { riskFreeRate: 3, beta: 1.0, marketRiskPremium: 5, costOfDebt: 4, debtToEquityRatio: 40 },
 };
 
 export function useValuation() {
@@ -168,17 +154,21 @@ export function useValuation() {
     });
   };
 
-  const updateProjection = (scenario: Scenario, key: keyof ValuationState['projections'][Scenario], value: number) => {
+  const updateAllHistoricalData = (data: ValuationState['historicalData']) => {
+    setState(s => ({ ...s, historicalData: data }));
+  };
+
+  const updateProjection = (key: keyof ValuationState['projections'], value: number) => {
     setState(s => ({
       ...s,
-      projections: { ...s.projections, [scenario]: { ...s.projections[scenario], [key]: value } }
+      projections: { ...s.projections, [key]: value }
     }));
   };
 
-  const updateWacc = (scenario: Scenario, key: keyof ValuationState['wacc'][Scenario], value: number) => {
+  const updateWacc = (key: keyof ValuationState['wacc'], value: number) => {
     setState(s => ({
       ...s,
-      wacc: { ...s.wacc, [scenario]: { ...s.wacc[scenario], [key]: value } }
+      wacc: { ...s.wacc, [key]: value }
     }));
   };
 
@@ -189,76 +179,68 @@ export function useValuation() {
     }));
   };
 
-  const setScenario = (scenario: Scenario) => {
-    setState(s => ({ ...s, scenario }));
-  };
-
   const applyHistoricalAverages = () => {
     const avgs = calculateHistoricalAverages(state.historicalData, state.generalInfo.year0Ppe);
     setState(s => ({
       ...s,
-      projections: {
-        '기술집약': { ...s.projections['기술집약'], ...avgs, revenueGrowthRate: avgs.revenueGrowthRate + 5, operatingMargin: avgs.operatingMargin + 5 },
-        '노동집약': { ...s.projections['노동집약'], ...avgs },
-        '사업지원서비스': { ...s.projections['사업지원서비스'], ...avgs, revenueGrowthRate: avgs.revenueGrowthRate - 5, operatingMargin: avgs.operatingMargin - 5 },
-      }
+      projections: { ...s.projections, ...avgs }
     }));
   };
 
   const calculatedResults = useMemo(() => {
-    const calculateForScenario = (scen: Scenario) => {
-      const proj = state.projections[scen];
-      const w = state.wacc[scen];
+    const proj = state.projections;
+    const w = state.wacc;
 
-      // WACC Calculation
-      const taxRate = proj.taxRate / 100;
-      const ke = (w.riskFreeRate + w.beta * w.marketRiskPremium) / 100;
-      const kd = (w.costOfDebt / 100) * (1 - taxRate);
-      const deRatio = w.debtToEquityRatio / 100;
-      const we = 1 / (1 + deRatio);
-      const wd = deRatio / (1 + deRatio);
-      const calculatedWacc = we * ke + wd * kd;
+    // WACC Calculation
+    const taxRate = proj.taxRate / 100;
+    const ke = (w.riskFreeRate + w.beta * w.marketRiskPremium) / 100;
+    const kd = (w.costOfDebt / 100) * (1 - taxRate);
+    const deRatio = w.debtToEquityRatio / 100;
+    const we = 1 / (1 + deRatio);
+    const wd = deRatio / (1 + deRatio);
+    const calculatedWacc = we * ke + wd * kd;
 
-      // Projections
-      let currentRevenue = state.historicalData[state.historicalData.length - 1].revenue;
-      let currentNwc = currentRevenue * (proj.nwcPercentOfRevenue / 100);
-      const years: CalculatedYear[] = [];
+    // Projections
+    let currentRevenue = state.historicalData[state.historicalData.length - 1].revenue;
+    let currentNwc = currentRevenue * (proj.nwcPercentOfRevenue / 100);
+    const years: CalculatedYear[] = [];
+    
+    for (let i = 1; i <= 5; i++) {
+      const revenue = currentRevenue * (1 + proj.revenueGrowthRate / 100);
+      const ebit = revenue * (proj.operatingMargin / 100);
+      const taxes = ebit * taxRate;
+      const nopat = ebit - taxes;
+      const da = revenue * (proj.daPercentOfRevenue / 100);
+      const capex = revenue * (proj.capexPercentOfRevenue / 100);
+      const nwc = revenue * (proj.nwcPercentOfRevenue / 100);
+      const changeInNwc = nwc - currentNwc;
+      const fcff = nopat + da - capex - changeInNwc;
       
-      for (let i = 1; i <= 5; i++) {
-        const revenue = currentRevenue * (1 + proj.revenueGrowthRate / 100);
-        const ebit = revenue * (proj.operatingMargin / 100);
-        const taxes = ebit * taxRate;
-        const nopat = ebit - taxes;
-        const da = revenue * (proj.daPercentOfRevenue / 100);
-        const capex = revenue * (proj.capexPercentOfRevenue / 100);
-        const nwc = revenue * (proj.nwcPercentOfRevenue / 100);
-        const changeInNwc = nwc - currentNwc;
-        const fcff = nopat + da - capex - changeInNwc;
-        
-        const discountFactor = Math.pow(1 + calculatedWacc, i);
-        const pvOfFcff = fcff / discountFactor;
+      const discountFactor = Math.pow(1 + calculatedWacc, i);
+      const pvOfFcff = fcff / discountFactor;
 
-        years.push({
-          year: currentYear + i - 1,
-          revenue, ebit, taxes, nopat, da, capex, nwc, changeInNwc, fcff, pvOfFcff
-        });
+      years.push({
+        year: currentYear + i - 1,
+        revenue, ebit, taxes, nopat, da, capex, nwc, changeInNwc, fcff, pvOfFcff
+      });
 
-        currentRevenue = revenue;
-        currentNwc = nwc;
-      }
+      currentRevenue = revenue;
+      currentNwc = nwc;
+    }
 
-      const sumPvFcff = years.reduce((sum, y) => sum + y.pvOfFcff, 0);
-      const terminalYearFcff = years[years.length - 1].fcff * (1 + proj.terminalGrowthRate / 100);
-      const terminalValue = terminalYearFcff / (calculatedWacc - proj.terminalGrowthRate / 100);
-      const pvOfTerminalValue = terminalValue / Math.pow(1 + calculatedWacc, 5);
+    const sumPvFcff = years.reduce((sum, y) => sum + y.pvOfFcff, 0);
+    const terminalYearFcff = years[years.length - 1].fcff * (1 + proj.terminalGrowthRate / 100);
+    const terminalValue = terminalYearFcff / (calculatedWacc - proj.terminalGrowthRate / 100);
+    const pvOfTerminalValue = terminalValue / Math.pow(1 + calculatedWacc, 5);
 
-      const enterpriseValue = sumPvFcff + pvOfTerminalValue;
-      
-      const { cashAndEquivalents, nonOperatingAssets, totalDebt, underfundedSeverance, unpaidWages, contingentLiabilities } = state.valueAdjustments;
-      const totalAdjustments = cashAndEquivalents + nonOperatingAssets - totalDebt - underfundedSeverance - unpaidWages - contingentLiabilities;
-      const equityValue = enterpriseValue + totalAdjustments;
+    const enterpriseValue = sumPvFcff + pvOfTerminalValue;
+    
+    const { cashAndEquivalents, nonOperatingAssets, totalDebt, underfundedSeverance, unpaidWages, contingentLiabilities } = state.valueAdjustments;
+    const totalAdjustments = cashAndEquivalents + nonOperatingAssets - totalDebt - underfundedSeverance - unpaidWages - contingentLiabilities;
+    const equityValue = enterpriseValue + totalAdjustments;
 
-      return {
+    return {
+      current: {
         calculatedWacc,
         years,
         sumPvFcff,
@@ -267,15 +249,6 @@ export function useValuation() {
         enterpriseValue,
         equityValue,
         totalAdjustments
-      };
-    };
-
-    return {
-      current: calculateForScenario(state.scenario),
-      all: {
-        '기술집약': calculateForScenario('기술집약'),
-        '노동집약': calculateForScenario('노동집약'),
-        '사업지원서비스': calculateForScenario('사업지원서비스'),
       }
     };
   }, [state]);
@@ -286,10 +259,10 @@ export function useValuation() {
     updateIndustryMultiples,
     updateValueAdjustments,
     updateHistoricalYear,
+    updateAllHistoricalData,
     updateProjection,
     updateWacc,
     resetWaccToDefault,
-    setScenario,
     applyHistoricalAverages,
     calculatedResults
   };

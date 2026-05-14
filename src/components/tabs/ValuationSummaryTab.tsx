@@ -31,7 +31,7 @@ const CustomYAxisTick = (props: any) => {
 
 export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeof useValuation> }) {
   const { state, calculatedResults } = valuation;
-  const { generalInfo, scenario, industryMultiples } = state;
+  const { generalInfo, industryMultiples } = state;
   const currentCalc = calculatedResults.current;
 
   const [waccOffset, setWaccOffset] = useState(0);
@@ -70,19 +70,26 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
     
     try {
       setIsExporting(true);
-      
-      // Add a delay to ensure UI is ready and Recharts animations are disabled
       await new Promise(resolve => setTimeout(resolve, 500));
-      
       const element = reportRef.current;
-      
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
         windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight
+        windowHeight: element.scrollHeight,
+        onclone: (clonedDoc) => {
+          const styles = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styles.length; i++) {
+            const style = styles[i];
+            if (style.innerHTML.includes('oklch')) {
+              // Replace oklch with a fallback color (indigo-600 approx #6366f1) 
+              // to prevent html2canvas parser from crashing
+              style.innerHTML = style.innerHTML.replace(/oklch\([^)]+\)/g, '#6366f1');
+            }
+          }
+        }
       });
       
       if (canvas.width === 0 || canvas.height === 0) {
@@ -91,12 +98,9 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      
       const filename = `가치평가리포트_${generalInfo.companyName || '기업'}.pdf`;
       
       try {
@@ -115,7 +119,6 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
-      // If we are in an iframe (like AI Studio preview), downloads might be blocked silently
       if (window !== window.parent) {
         setTimeout(() => {
           alert('다운로드가 시작되지 않았나요?\n\n미리보기 창에서는 브라우저 보안 정책으로 인해 다운로드가 차단될 수 있습니다. 우측 상단의 [새 탭에서 열기] 버튼을 눌러 새 창에서 앱을 실행한 후 다시 시도해주세요.');
@@ -137,7 +140,6 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
     '영업이익': Math.round(y.ebit),
   }));
 
-  // Football Field Chart Data
   const footballFieldData = useMemo(() => {
     const lastYear = state.historicalData[state.historicalData.length - 1];
     const ebit = lastYear.revenue - lastYear.cogs - lastYear.sga;
@@ -146,10 +148,10 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
 
     return [
       { 
-        name: `현금흐름할인법\n(DCF) ${scenario}`, 
+        name: '현금흐름할인법\n(DCF)', 
         range: [
-          calculatedResults.all[scenario].equityValue * 0.9, 
-          calculatedResults.all[scenario].equityValue * 1.1
+          currentCalc.equityValue * 0.9, 
+          currentCalc.equityValue * 1.1
         ] 
       },
       { 
@@ -167,13 +169,14 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
         ] 
       },
     ];
-  }, [calculatedResults, state.historicalData, generalInfo, scenario, industryMultiples, currentCalc.totalAdjustments]);
+  }, [currentCalc, state.historicalData, industryMultiples]);
 
-  // Simulated Equity Value based on sliders
   const simulatedEquityValue = useMemo(() => {
     const w = currentCalc.calculatedWacc + (waccOffset / 100);
-    const g = (state.projections[scenario].terminalGrowthRate / 100) + (growthOffset / 100);
+    const g = (state.projections.terminalGrowthRate / 100) + (growthOffset / 100);
     
+    if (w <= g) return 0;
+
     const terminalYearFcff = currentCalc.years[currentCalc.years.length - 1].fcff * (1 + g);
     const tv = terminalYearFcff / (w - g);
     const pvTv = tv / Math.pow(1 + w, 5);
@@ -185,46 +188,46 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
 
     const ev = sumPv + pvTv;
     return ev + currentCalc.totalAdjustments;
-  }, [currentCalc, state.projections, scenario, waccOffset, growthOffset]);
+  }, [currentCalc, state.projections, waccOffset, growthOffset]);
 
   return (
     <div className="space-y-8" ref={reportRef}>
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 mb-2">가치평가 요약</h2>
-          <p className="text-slate-500 text-sm"><strong className="text-indigo-600">{scenario}</strong> 시나리오에 대한 최종 DCF 산출 결과 및 민감도 분석입니다.</p>
+          <p className="text-slate-500 text-sm">최종 DCF 산출 결과 및 민감도 분석입니다.</p>
         </div>
         <button 
           onClick={handleExport}
           disabled={isExporting}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed print-hide"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed print-hide"
         >
           {isExporting ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <FileText className="w-4 h-4" />
           )}
-          {isExporting ? '생성 중...' : '리포트 내보내기 (PDF)'}
+          {isExporting ? '생성 중...' : 'PDF 리포트'}
         </button>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-sm font-medium text-slate-500 mb-1">잉여현금흐름 현재가치<br/>(PV of FCFF)</p>
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(currentCalc.sumPvFcff)}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] md:text-sm font-medium text-slate-500 mb-1">FCFF 현재가치</p>
+          <p className="text-lg md:text-2xl font-bold text-slate-900">{formatCurrency(currentCalc.sumPvFcff)}</p>
         </div>
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-sm font-medium text-slate-500 mb-1">영구가치 현재가치<br/>(PV of TV)</p>
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(currentCalc.pvOfTerminalValue)}</p>
+        <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] md:text-sm font-medium text-slate-500 mb-1">영구가치 현재가치</p>
+          <p className="text-lg md:text-2xl font-bold text-slate-900">{formatCurrency(currentCalc.pvOfTerminalValue)}</p>
         </div>
-        <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 shadow-sm">
-          <p className="text-sm font-medium text-indigo-600 mb-1">기업가치<br/>(Enterprise Value)</p>
-          <p className="text-3xl font-bold text-indigo-900">{formatCurrency(currentCalc.enterpriseValue)}</p>
+        <div className="bg-indigo-50 p-4 md:p-6 rounded-2xl border border-indigo-100 shadow-sm col-span-1">
+          <p className="text-[10px] md:text-sm font-medium text-indigo-600 mb-1">기업가치 (EV)</p>
+          <p className="text-lg md:text-2xl font-bold text-indigo-900">{formatCurrency(currentCalc.enterpriseValue)}</p>
         </div>
-        <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 shadow-sm">
-          <p className="text-sm font-medium text-emerald-600 mb-1">내재 주주가치<br/>(Equity Value)</p>
-          <p className="text-3xl font-bold text-emerald-900">{formatCurrency(currentCalc.equityValue)}</p>
+        <div className="bg-emerald-50 p-4 md:p-6 rounded-2xl border border-emerald-100 shadow-sm col-span-1">
+          <p className="text-[10px] md:text-sm font-medium text-emerald-600 mb-1">주주가치 (Equity)</p>
+          <p className="text-lg md:text-2xl font-bold text-emerald-900 text-emerald-700">{formatCurrency(currentCalc.equityValue)}</p>
         </div>
       </div>
 
@@ -330,15 +333,26 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
       </div>
 
       {/* Football Field Chart */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h3 className="text-lg font-medium text-slate-900 mb-2">가치평가 요약 (Football Field Chart)</h3>
         <p className="text-sm text-slate-500 mb-6">다양한 가치평가 방법론에 따른 주주가치 비교입니다.</p>
-        <div className="h-80">
+        <div className="h-64 sm:h-80">
           <ResponsiveContainer width="100%" height={isExporting ? 320 : "100%"}>
-            <BarChart layout="vertical" data={footballFieldData} margin={{ top: 5, right: 30, bottom: 5, left: 100 }}>
+            <BarChart 
+              layout="vertical" 
+              data={footballFieldData} 
+              margin={{ top: 5, right: 10, bottom: 5, left: window.innerWidth < 640 ? 0 : 60 }}
+            >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-              <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} tickFormatter={formatCompact} />
-              <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={<CustomYAxisTick />} width={180} />
+              <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={formatCompact} />
+              <YAxis 
+                dataKey="name" 
+                type="category" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={window.innerWidth < 640 ? false : <CustomYAxisTick />} 
+                width={window.innerWidth < 640 ? 40 : 150} 
+              />
               <RechartsTooltip 
                 cursor={{ fill: '#f1f5f9' }}
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -349,7 +363,7 @@ export function ValuationSummaryTab({ valuation }: { valuation: ReturnType<typeo
                   return formatCurrency(value);
                 }}
               />
-              <Bar dataKey="range" fill="#10b981" radius={[4, 4, 4, 4]} barSize={32} isAnimationActive={!isExporting} />
+              <Bar dataKey="range" fill="#10b981" radius={[4, 4, 4, 4]} barSize={24} isAnimationActive={!isExporting} />
             </BarChart>
           </ResponsiveContainer>
         </div>
